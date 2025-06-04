@@ -10,31 +10,63 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.post('/check-eligibility', (req, res) => {
-  const { age, income, investment, acceptTerms } = req.body;
+  const {
+    name,
+    age,
+    occupation,
+    income,
+    citystate,
+    investment,
+    loan,
+    knowledge,
+    expectation,
+    reaction,
+    documents,
+    kyc,
+    rejectreaction
+  } = req.body;
+
   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const location = geoip.lookup(ip) || {};
 
-  const isEligible = age >= 21 && income >= 25000 && investment <= income * 0.5;
+  // Eligibility Logic
+  const isEligible =
+    age >= 25 && age <= 60 &&
+    income >= 40000 &&
+    (investment === "50k-1L" || investment === "1L-2L" || investment === "2Lplus") &&
+    loan !== "difficult" &&
+    expectation !== "quick" &&
+    reaction !== "aggressive" &&
+    documents === "yes" &&
+    kyc === "yes" &&
+    rejectreaction !== "angry";
 
   const log = {
     timestamp: new Date().toISOString(),
     ip,
     location,
+    name,
     age,
+    occupation,
     income,
+    citystate,
     investment,
-    acceptedTerms: acceptTerms,
-    status: isEligible ? 'eligible' : (acceptTerms ? 'ineligible_accepted' : 'rejected')
+    loan,
+    knowledge,
+    expectation,
+    reaction,
+    documents,
+    kyc,
+    rejectreaction,
+    status: isEligible ? 'eligible' : 'ineligible'
   };
 
   fs.appendFileSync('eligibility_logs.json', JSON.stringify(log) + '\n');
 
   if (isEligible) {
     res.json({ status: 'eligible' });
-  } else if (acceptTerms) {
-    res.json({ status: 'ineligible_accepted' });
   } else {
-    res.json({ status: 'rejected' });
+    res.json({ status: 'ineligible' });
   }
 });
 
