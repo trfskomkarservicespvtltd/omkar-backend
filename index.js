@@ -1,27 +1,35 @@
 const express = require("express");
 const cors = require("cors");
-const app = express();
 
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-app.post("/check-eligibility", (req, res) => {
-  const { age, income, investment, acceptTerms } = req.body;
+// Routes
+app.post("/api/submit", (req, res) => {
+  const formData = req.body;
 
-  if (!acceptTerms || !age || !income || !investment) {
-    return res.status(400).json({ status: "error", message: "Missing data" });
-  }
+  // Eligibility logic
+  const eligible =
+    formData.monthlyIncome >= 50000 &&
+    formData.investmentAmount !== "Below ₹50,000" &&
+    formData.stockKnowledge !== "None" &&
+    formData.kyc === "Yes" &&
+    formData.panAgreement === "Yes" &&
+    formData.reactionToRejection !== "Get angry or post bad review" &&
+    formData.repaymentReaction !== "I’ll get aggressive";
 
-  const isEligible = age >= 21 && income >= 25000;
-
-  if (isEligible) {
-    return res.status(200).json({ status: "eligible" });
+  if (eligible) {
+    return res.status(200).json({ status: "success", eligible: true });
   } else {
-    return res.status(200).json({ status: "not_eligible" });
+    return res.status(200).json({ status: "success", eligible: false });
   }
 });
 
-const PORT = process.env.PORT || 3000;
+// Server start
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
