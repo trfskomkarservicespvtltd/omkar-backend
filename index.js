@@ -1,35 +1,63 @@
-const express = require("express");
-const cors = require("cors");
+const express = require('express');
+const { google } = require('googleapis');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
-
-// Middleware
 app.use(cors());
-app.use(express.json());
 
-// Routes
-app.post("/api/submit", (req, res) => {
-  const formData = req.body;
+const PORT = process.env.PORT || 3000;
 
-  // Eligibility logic
-  const eligible =
-    formData.monthlyIncome >= 50000 &&
-    formData.investmentAmount !== "Below ₹50,000" &&
-    formData.stockKnowledge !== "None" &&
-    formData.kyc === "Yes" &&
-    formData.panAgreement === "Yes" &&
-    formData.reactionToRejection !== "Get angry or post bad review" &&
-    formData.repaymentReaction !== "I’ll get aggressive";
+const auth = new google.auth.GoogleAuth({
+  keyFile: 'credentials.json',
+  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+});
 
-  if (eligible) {
-    return res.status(200).json({ status: "success", eligible: true });
-  } else {
-    return res.status(200).json({ status: "success", eligible: false });
+const sheetId = '197FwVUK8EoT11XqFjI7C80hgkzsI6Wl7ESd1GerrLXc';
+const sheetRange = 'Sheet1!A2:K1000';
+
+app.get('/investor', async (req, res) => {
+  const email = req.query.email?.toLowerCase();
+  if (!email) return res.status(400).send('Email is required');
+
+  try {
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: sheetRange,
+    });
+
+    const rows = response.data.values;
+
+    const headers = [
+      'Investor ID',
+      'Full Name',
+      'Email',
+      'Phone',
+      'Investment Amount',
+      'Investment Date',
+      'Plan',
+      'Monthly Return',
+      'Capital Return Date',
+      'Status',
+      'Login Email'
+    ];
+
+    const investor = rows.find(row => (row[10] || '').toLowerCase() === email);
+
+    if (!investor) return res.status(404).send('Investor not found');
+
+    const data = {};
+    headers.forEach((header, index) => {
+      data[header] = investor[index] || '';
+    });
+
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Something went wrong');
   }
 });
 
-// Server start
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
