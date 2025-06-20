@@ -1,63 +1,147 @@
+
 const express = require('express');
-const { google } = require('googleapis');
+const bodyParser = require('body-parser');
 const cors = require('cors');
+const { google } = require('googleapis');
 
 const app = express();
+const PORT = 8080;
+
+// Middleware
 app.use(cors());
+app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3000;
-
+// Google Sheets setup
 const auth = new google.auth.GoogleAuth({
   keyFile: 'credentials.json',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
-const sheetId = '197FwVUK8EoT11XqFjI7C80hgkzsI6Wl7ESd1GerrLXc';
-const sheetRange = 'Sheet1!A2:K1000';
+const spreadsheetId = '197FwVUK8EoT11XqFjI7C80hgkzsI6Wl7ESd1GerrLXc';
 
-app.get('/investor', async (req, res) => {
-  const email = req.query.email?.toLowerCase();
-  if (!email) return res.status(400).send('Email is required');
+// Add Investor
+app.post('/add-investor', async (req, res) => {
+  const { investorId, fullName, email, phone, amount, date, plan, monthlyReturn, capitalReturnDate, status, loginEmail } = req.body;
+  try {
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
 
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'Investor!A2:K',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[investorId, fullName, email, phone, amount, date, plan, monthlyReturn, capitalReturnDate, status, loginEmail]],
+      },
+    });
+
+    res.status(200).send('Investor added');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error adding investor');
+  }
+});
+
+// Get Investors
+app.get('/get-investors', async (req, res) => {
   try {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
 
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: sheetRange,
+      spreadsheetId,
+      range: 'Investor!A2:K',
     });
 
-    const rows = response.data.values;
-
-    const headers = [
-      'Investor ID',
-      'Full Name',
-      'Email',
-      'Phone',
-      'Investment Amount',
-      'Investment Date',
-      'Plan',
-      'Monthly Return',
-      'Capital Return Date',
-      'Status',
-      'Login Email'
-    ];
-
-    const investor = rows.find(row => (row[10] || '').toLowerCase() === email);
-
-    if (!investor) return res.status(404).send('Investor not found');
-
-    const data = {};
-    headers.forEach((header, index) => {
-      data[header] = investor[index] || '';
-    });
-
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Something went wrong');
+    res.status(200).json(response.data.values);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error fetching investors');
   }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Add Payout
+app.post('/add-payout', async (req, res) => {
+  const { payoutId, investor, month, payoutDate, payoutAmount, status } = req.body;
+  try {
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'Payout!A2:F',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[payoutId, investor, month, payoutDate, payoutAmount, status]],
+      },
+    });
+
+    res.status(200).send('Payout added');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error adding payout');
+  }
+});
+
+// Get Payouts
+app.get('/get-payouts', async (req, res) => {
+  try {
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Payout!A2:F',
+    });
+
+    res.status(200).json(response.data.values);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error fetching payouts');
+  }
+});
+
+// Add Referral
+app.post('/add-referral', async (req, res) => {
+  const { referralId, referrerName, referrerId, referredPersonName, investmentAmount, referralCommission, status } = req.body;
+  try {
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'Referral!A2:G',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[referralId, referrerName, referrerId, referredPersonName, investmentAmount, referralCommission, status]],
+      },
+    });
+
+    res.status(200).send('Referral added');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error adding referral');
+  }
+});
+
+// Get Referrals
+app.get('/get-referrals', async (req, res) => {
+  try {
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Referral!A2:G',
+    });
+
+    res.status(200).json(response.data.values);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error fetching referrals');
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
